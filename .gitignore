@@ -10,3 +10,13 @@ data/chroma_db/*
 data/*.db
 !data/uploads/.gitkeep
 !data/chroma_db/.gitkeep
+
+
+.env
+__pycache__/
+*.pyc
+.venv/
+venv/
+data/chroma_db/
+data/uploads/
+data/chat_history.db
