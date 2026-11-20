@@ -1,7 +1,10 @@
 
 import uuid
 import logging
+import time
+import logging
 
+logger = logging.getLogger(__name__)
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from pydantic import BaseModel, Field
 from typing import TypedDict, List, Any
@@ -153,7 +156,13 @@ def chat(request: ChatRequest):
             detail="Document not found. Upload it again."
         )
 
+    start_time = time.time()
+
     try:
+        logger.info("========== CHAT STARTED ==========")
+        logger.info("Provider: %s", request.provider)
+        logger.info("Document ID: %s", request.document_id)
+
         initial_state: RAGState = {
             "question": request.question.strip(),
             "document_id": request.document_id,
@@ -164,7 +173,14 @@ def chat(request: ChatRequest):
             "answer": ""
         }
 
+        logger.info("Starting LangGraph execution...")
+
         result = rag_graph.invoke(initial_state)
+
+        logger.info(
+            "LangGraph completed in %.2f seconds",
+            time.time() - start_time
+        )
 
         answer = normalize_answer(result["answer"])
 
@@ -173,12 +189,20 @@ def chat(request: ChatRequest):
             for doc in result.get("documents", [])
         })
 
+        logger.info("Answer generated successfully.")
+        logger.info("Source pages: %s", sources)
+
         save_chat(
             request.document_id,
             request.question,
             answer,
             request.provider,
             sources
+        )
+
+        logger.info(
+            "CHAT COMPLETED in %.2f seconds",
+            time.time() - start_time
         )
 
         return {
@@ -190,10 +214,19 @@ def chat(request: ChatRequest):
 
     except ValueError as exc:
         logger.exception("Chat validation/configuration error")
-        raise HTTPException(status_code=400, detail=str(exc))
+
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc)
+        )
 
     except Exception as exc:
-        logger.exception("Chat endpoint failed: %s", exc)
+        logger.exception(
+            "Chat endpoint failed after %.2f seconds: %s",
+            time.time() - start_time,
+            exc
+        )
+
         raise HTTPException(
             status_code=502,
             detail="Answer generation failed. Check backend logs."
